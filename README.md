@@ -94,7 +94,7 @@ DeviceLogonEvents
 
 ### Rule 2 — `CDF-corp-db03-MySQL` (MySQL logon parsing)
 
-The MySQL general log has no structured `ActionType` field — it's raw text. This rule parses connection IDs out of the raw log lines, correlates `Connect` events against `Access denied` events by connection ID, and derives a clean `LogonSuccess` / `LogonFailure` classification:
+The MySQL general log has no structured `ActionType` field it's raw text. This rule parses connection IDs out of the raw log lines, correlates `Connect` events against `Access denied` events by connection ID, and derives a clean `LogonSuccess` / `LogonFailure` classification:
 
 ```kql
 let MyDevice = "corp-db03";
@@ -142,7 +142,7 @@ To simulate a realistic misconfiguration (this happens far more often in the wil
 
 Timestamp of exposure: **`2026-08-04T16:33:33Z`**
 
-Internal address space for reference/exclusion during hunting: `10.0.0.0/21`, `10.1.0.0/21`, `10.2.0.0/16`, `10.3.0.0/16` (also monitored by Tenable — expected internal scan noise).
+Internal address space for reference/exclusion during hunting: `10.0.0.0/21`, `10.1.0.0/21`, `10.2.0.0/16`, `10.3.0.0/16` (also monitored by Tenable, expected internal scan noise).
 
 ## The Attack: Reconstructed Timeline
 
@@ -154,11 +154,11 @@ Internal address space for reference/exclusion during hunting: `10.0.0.0/21`, `1
 | `2026-08-05T05:08:03–05Z` | Generic credential-stuffing bot (`77.90.185.30`) tries `root`/`admin`/`sa` — all fail |
 | `2026-08-05T06:19:10Z` | `64.89.163.80` fails root login with no password |
 | `2026-08-05T06:19:20Z` | `64.89.163.80` fails again |
-| **`2026-08-05T06:19:27Z`** | **`64.89.163.80` succeeds** — almost certainly guessed `root`/`root` |
+| **`2026-08-05T06:19:27Z`** | **`64.89.163.80` succeeds** almost certainly guessed `root`/`root` |
 | `06:19:27Z – 06:19:57Z` | Recon: `SHOW DATABASES`, schema enumeration via `INFORMATION_SCHEMA`, `SELECT *` against every table in `sakila`, `world`, `fin_cmpy` (including `customers`, `credentials`, `payments`, `orders`) |
 | `06:19:56Z – 06:19:57Z` | `DROP DATABASE`/`DROP TABLE` executed against all three schemas |
 | `06:19:57Z` | `RECOVER_YOUR_DATA` database/table created; ransom note inserted (0.0132 BTC to `bc1q7jps5432akuflg9flw2vu6hgmmj5hrrdu6c5gm`, contact `ak+24lv3@onionmail.org`, DATAID `24LV3`) |
-| `06:19:58Z` | `RESET MASTER` + `PURGE BINARY LOGS` — anti-forensics, kills point-in-time recovery |
+| `06:19:58Z` | `RESET MASTER` + `PURGE BINARY LOGS`  anti-forensics, kills point-in-time recovery |
 | `06:19:59Z` | `REVOKE INSERT, UPDATE, DELETE, DROP, CREATE ON *.* FROM 'root'@'%'` then `SHUTDOWN` — bot locks the door behind itself |
 | Aug 5 – Aug 9 (recurring) | Multiple **different** source IPs (`77.90.185.21`, `213.209.159.115`, `64.89.163.x` range, others) repeatedly rediscover the exposed instance, re-read the ransom table, and in some cases re-run the entire drop/ransom sequence — evidence of mass, opportunistic internet-wide scanning rather than a single targeted actor |
 
@@ -222,7 +222,7 @@ MySQLAudit_CL
 
 ## Why the Windows-Level Logs Showed "Nothing Suspicious"
 
-When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out — no failed RDP attempts, no suspicious interactive logons. This is expected and worth calling out: **the attacker never authenticated to Windows at all.** The entire attack occurred inside the MySQL protocol on port 3306, which is invisible to OS-level authentication logging. This is exactly why the custom MySQL audit log ingestion pipeline mattered — without it, this incident would have been completely dark to a SOC relying only on native Windows/Defender telemetry.
+When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out — no failed RDP attempts, no suspicious interactive logons. This is expected and worth calling out: **the attacker never authenticated to Windows at all.** The entire attack occurred inside the MySQL protocol on port 3306, which is invisible to OS-level authentication logging. This is exactly why the custom MySQL audit log ingestion pipeline mattered without it, this incident would have been completely dark to a SOC relying only on native Windows/Defender telemetry.
 
 
 ## Indicators of Compromise
@@ -257,7 +257,7 @@ When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out — 
 3. **Disable password-less/weak-password root** entirely; enforce strong, unique credentials, and disable remote root login (`root@'%'` should not exist).
 4. **Least privilege** — application accounts should never have `DROP`/`CREATE`/`SHUTDOWN` rights.
 5. **Enable binary logging redundancy** (ship binlogs off-host) so `RESET MASTER`/`PURGE BINARY LOGS` doesn't destroy all recovery options.
-6. **Instrument application-layer logs**, not just OS/EDR telemetry — this incident was invisible at the Windows logon layer.
+6. **Instrument application-layer logs**, not just OS/EDR telemetry this incident was invisible at the Windows logon layer.
 
 ## Appendix — Full Ransom Note
 
