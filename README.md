@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-I stood up a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realistic dummy PII/financial data, wired up full audit logging into Microsoft Sentinel, and then **intentionally exposed it to the internet** with a weak root password. Within **6 hours** of exposure, an automated ransomware bot found it, dumped the data, destroyed it, planted a Bitcoin ransom note, purged the binary logs, revoked its own privileges, and shut the server down — all in about **32 seconds** once it got in. This writeup documents the lab build, the detection engineering, and the full threat hunt, reconstructing the attack from raw logs.
+I stood up a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realistic dummy PII/financial data, wired up full audit logging into Microsoft Sentinel, and then **intentionally exposed it to the internet** with a weak root password. Within **6 hours** of exposure, an automated ransomware bot found it, dumped the data, destroyed it, planted a Bitcoin ransom note, purged the binary logs, revoked its own privileges, and shut the server down, all in about **32 seconds** once it got in. This writeup documents the lab build, the detection engineering, and the full threat hunt, reconstructing the attack from raw logs.
 
 ## Objective / Skills Demonstrated
 
@@ -23,7 +23,7 @@ I stood up a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realist
 
 | Component | Detail |
 |---|---|
-| Host | `corp-db03` — Windows 11 VM, Azure |
+| Host | `corp-db03` - Windows 11 VM, Azure |
 | Database | MySQL 8.0.45.0 (Community Server) |
 | EDR | Microsoft Defender for Endpoint (onboarded) |
 | SIEM | Microsoft Sentinel |
@@ -34,10 +34,10 @@ I stood up a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realist
 
 To make the target look like a real target worth stealing from, I built four related tables and populated them programmatically:
 
-- `customers` — full PII (name, email, address, DOB, fake SSN), ~3,500 rows
-- `orders` — purchases tied to customers
-- `payments` — masked card data + last4 per order
-- `credentials` — fake application logins (the "juiciest" table for an attacker)
+- `customers` - full PII (name, email, address, DOB, fake SSN), ~3,500 rows
+- `orders` - purchases tied to customers
+- `payments` - masked card data + last4 per order
+- `credentials` - fake application logins (the "juiciest" table for an attacker)
 
 ## Step 1 — Enabling MySQL Audit Logging
 
@@ -148,10 +148,10 @@ Internal address space for reference/exclusion during hunting: `10.0.0.0/21`, `1
 
 | Time (UTC) | Event |
 |---|---|
-| `2026-08-04T16:33:33Z` | Firewall/NSG opened — exposure window begins |
+| `2026-08-04T16:33:33Z` | Firewall/NSG opened - exposure window begins |
 | `2026-08-05T00:20:46Z` | `root@'%'` created with weak password, granted full privileges |
-| `2026-08-05T04:04:50Z` | First external probe: `root@64.89.163.146` — access denied, no password |
-| `2026-08-05T05:08:03–05Z` | Generic credential-stuffing bot (`77.90.185.30`) tries `root`/`admin`/`sa` — all fail |
+| `2026-08-05T04:04:50Z` | First external probe: `root@64.89.163.146` - access denied, no password |
+| `2026-08-05T05:08:03–05Z` | Generic credential-stuffing bot (`77.90.185.30`) tries `root`/`admin`/`sa` - all fail |
 | `2026-08-05T06:19:10Z` | `64.89.163.80` fails root login with no password |
 | `2026-08-05T06:19:20Z` | `64.89.163.80` fails again |
 | **`2026-08-05T06:19:27Z`** | **`64.89.163.80` succeeds** almost certainly guessed `root`/`root` |
@@ -160,7 +160,7 @@ Internal address space for reference/exclusion during hunting: `10.0.0.0/21`, `1
 | `06:19:57Z` | `RECOVER_YOUR_DATA` database/table created; ransom note inserted (0.0132 BTC to `bc1q7jps5432akuflg9flw2vu6hgmmj5hrrdu6c5gm`, contact `ak+24lv3@onionmail.org`, DATAID `24LV3`) |
 | `06:19:58Z` | `RESET MASTER` + `PURGE BINARY LOGS`  anti-forensics, kills point-in-time recovery |
 | `06:19:59Z` | `REVOKE INSERT, UPDATE, DELETE, DROP, CREATE ON *.* FROM 'root'@'%'` then `SHUTDOWN` — bot locks the door behind itself |
-| Aug 5 – Aug 9 (recurring) | Multiple **different** source IPs (`77.90.185.21`, `213.209.159.115`, `64.89.163.x` range, others) repeatedly rediscover the exposed instance, re-read the ransom table, and in some cases re-run the entire drop/ransom sequence — evidence of mass, opportunistic internet-wide scanning rather than a single targeted actor |
+| Aug 5 – Aug 9 (recurring) | Multiple **different** source IPs (`77.90.185.21`, `213.209.159.115`, `64.89.163.x` range, others) repeatedly rediscover the exposed instance, re-read the ransom table, and in some cases re-run the entire drop/ransom sequence, evidence of mass opportunistic internet-wide scanning rather than a single targeted actor |
 
 **Total time from first successful login to full compromise + self-lockout: ~32 seconds.** This is a fully scripted bot, not a human operator.
 
@@ -222,7 +222,7 @@ MySQLAudit_CL
 
 ## Why the Windows-Level Logs Showed "Nothing Suspicious"
 
-When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out — no failed RDP attempts, no suspicious interactive logons. This is expected and worth calling out: **the attacker never authenticated to Windows at all.** The entire attack occurred inside the MySQL protocol on port 3306, which is invisible to OS-level authentication logging. This is exactly why the custom MySQL audit log ingestion pipeline mattered without it, this incident would have been completely dark to a SOC relying only on native Windows/Defender telemetry.
+When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out, no failed RDP attempts, no suspicious interactive logons. This is expected and worth calling out: **the attacker never authenticated to Windows at all.** The entire attack occurred inside the MySQL protocol on port 3306, which is invisible to OS-level authentication logging. This is exactly why the custom MySQL audit log ingestion pipeline mattered without it, this incident would have been completely dark to a SOC relying only on native Windows/Defender telemetry.
 
 
 ## Indicators of Compromise
@@ -255,7 +255,7 @@ When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out — 
 1. **Root cause:** `root@'%'` with a weak, guessable password, combined with an NSG rule allowing unrestricted inbound access to port 3306.
 2. **Never expose database ports directly to the internet.** Require VPN, bastion host, or Private Link/Private Endpoint for any remote DB administration.
 3. **Disable password-less/weak-password root** entirely; enforce strong, unique credentials, and disable remote root login (`root@'%'` should not exist).
-4. **Least privilege** — application accounts should never have `DROP`/`CREATE`/`SHUTDOWN` rights.
+4. **Least privilege** application accounts should never have `DROP`/`CREATE`/`SHUTDOWN` rights.
 5. **Enable binary logging redundancy** (ship binlogs off-host) so `RESET MASTER`/`PURGE BINARY LOGS` doesn't destroy all recovery options.
 6. **Instrument application-layer logs**, not just OS/EDR telemetry this incident was invisible at the Windows logon layer.
 
