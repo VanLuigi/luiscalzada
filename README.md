@@ -2,7 +2,7 @@
 
 **A Microsoft Sentinel + Defender for Endpoint threat hunting exercise, built from scratch on Azure.**
 
-<--IMAGE-->
+<img width="1731" height="909" alt="Image" src="https://github.com/user-attachments/assets/e7904b6b-c3d0-4d90-bc6c-326423d42802" />
 
 ## TL;DR
 
@@ -19,7 +19,7 @@ I stood up a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realist
 
 ## Lab Architecture
 
-<--IMAGE-->
+<img width="1693" height="929" alt="architecture" src="https://github.com/user-attachments/assets/c1369290-11f1-4788-aba6-8f5fc1228b72" />
 
 | Component | Detail |
 |---|---|
@@ -97,7 +97,6 @@ DeviceLogonEvents
 The MySQL general log has no structured `ActionType` field — it's raw text. This rule parses connection IDs out of the raw log lines, correlates `Connect` events against `Access denied` events by connection ID, and derives a clean `LogonSuccess` / `LogonFailure` classification:
 
 ```kql
-// SQL Server
 let MyDevice = "corp-db03";
 let FailedConnections =
 MySQLAudit_CL
@@ -131,7 +130,7 @@ MySQLAudit_CL
 
 To simulate a realistic misconfiguration (this happens far more often in the wild than it should), I deliberately:
 
-1. Set the local `Administrator` account password to `qwerty`, added `Guest` to the `Users` group, ran `gpupdate /force`.
+1. Set the local `Administrator` account password to `qwerty`, added `Guest` to the `Users` group, and ran `gpupdate /force`.
 2. Opened MySQL to the network with a trivially guessable credential pair:
    ```sql
    CREATE USER 'root'@'%' IDENTIFIED BY 'root';
@@ -165,13 +164,64 @@ Internal address space for reference/exclusion during hunting: `10.0.0.0/21`, `1
 
 **Total time from first successful login to full compromise + self-lockout: ~32 seconds.** This is a fully scripted bot, not a human operator.
 
-<--IMAGE-->
+```kql
+let MyDevice = "corp-db03";
+let MyTimeframe = todatetime("2026-08-04T16:33:33Z");
+let FailedConnections =
+MySQLAudit_CL
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend DeviceName = tostring(split(_ResourceId, "/")[-1])
+| where DeviceName == MyDevice
+| where RawData has "Access denied"
+| extend ConnectionId = extract(@"^\S+\s+(\d+)\s+Connect", 1, RawData)
+| distinct ConnectionId;
+MySQLAudit_CL
+| where TimeGenerated > MyTimeframe
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend DeviceName = tostring(split(_ResourceId, "/")[-1])
+| where DeviceName == MyDevice
+| where RawData has "Connect"
+| extend ConnectionId = extract(@"^\S+\s+(\d+)\s+Connect", 1, RawData)
+| extend ActionType =
+    case(
+        RawData has "Access denied", "LogonFailure",
+        ConnectionId in (FailedConnections), "Ignore",
+        "LogonSuccess"
+    )
+| where ActionType != "Ignore"
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend Username = replace_string(tostring(split(tostring(split(RawData,"@")[0]), " ")[-1]), "'", "")
+| extend IpAddress = replace_string(tostring(split(split(RawData,"@")[1], " ")[0]), "'", "")
+| project TimeGenerated, DeviceName, Username, IpAddress, ActionType, RawData
+| order by TimeGenerated desc
+```
+
+<img width="1264" height="718" alt="image" src="https://github.com/user-attachments/assets/022e3efe-755d-4d09-99e6-dda31474a66e" />
+
+
+```kql
+let MyDevice = "corp-db03"; // set your own device name
+let ServerVulnerableDateTime = todatetime("2026-08-04T16:33:33Z");
+MySQLAudit_CL
+| where TimeGenerated > ServerVulnerableDateTime
+| where RawData has "Query"
+| extend RawData = replace_string(RawData, "\t", " ")
+| extend DeviceName = tostring(split(_ResourceId, "/")[-1])
+| where DeviceName == MyDevice
+| extend ActionType = "Query"
+| extend Query = split(RawData, "Query")[1]
+| project TimeGenerated, DeviceName, ActionType, Query, RawData
+| order by TimeGenerated desc
+```
+
+<img width="1291" height="574" alt="image" src="https://github.com/user-attachments/assets/9e5a1908-ee43-419a-96a6-b31bea2710d4" />
+
+
 
 ## Why the Windows-Level Logs Showed "Nothing Suspicious"
 
 When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out — no failed RDP attempts, no suspicious interactive logons. This is expected and worth calling out: **the attacker never authenticated to Windows at all.** The entire attack occurred inside the MySQL protocol on port 3306, which is invisible to OS-level authentication logging. This is exactly why the custom MySQL audit log ingestion pipeline mattered — without it, this incident would have been completely dark to a SOC relying only on native Windows/Defender telemetry.
 
-(Note: unrelated RDP brute-force activity visible in the shared logon export is against a different host, `corp-na01-fe123`, and is not part of this incident.)
 
 ## Indicators of Compromise
 
