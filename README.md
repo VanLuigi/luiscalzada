@@ -6,7 +6,7 @@
 
 ## TL;DR
 
-I stood up a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realistic dummy PII/financial data, wired up full audit logging into Microsoft Sentinel, and then **intentionally exposed it to the internet** with a weak root password. Within **6 hours** of exposure, an automated ransomware bot found it, dumped the data, destroyed it, planted a Bitcoin ransom note, purged the binary logs, revoked its own privileges, and shut the server down, all in about **32 seconds** once it got in. This writeup documents the lab build, the detection engineering, and the full threat hunt, reconstructing the attack from raw logs.
+I created a Windows 11 VM on Azure, installed MySQL 8.0, seeded it with realistic dummy PII/financial data, wired up full audit logging into Microsoft Sentinel, and then **intentionally exposed it to the internet** with a weak root password. Within **6 hours** of exposure, an automated ransomware bot found it, dumped the data, destroyed it, planted a Bitcoin ransom note, purged the binary logs, revoked its own privileges, and shut the server down, all in about **32 seconds** once it got in. This writeup documents the lab build, the detection engineering, and the full threat hunt, reconstructing the attack from raw logs.
 
 ## Objective / Skills Demonstrated
 
@@ -256,8 +256,8 @@ When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out, no 
 2. **Never expose database ports directly to the internet.** Require VPN, bastion host, or Private Link/Private Endpoint for any remote DB administration.
 3. **Disable password-less/weak-password root** entirely; enforce strong, unique credentials, and disable remote root login (`root@'%'` should not exist).
 4. **Least privilege** application accounts should never have `DROP`/`CREATE`/`SHUTDOWN` rights.
-5. **Enable binary logging redundancy** (ship binlogs off-host) so `RESET MASTER`/`PURGE BINARY LOGS` doesn't destroy all recovery options.
-6. **Instrument application-layer logs**, not just OS/EDR telemetry this incident was invisible at the Windows logon layer.
+5. **Enable binary logging redundancy** ship binlogs off-host so `RESET MASTER`/`PURGE BINARY LOGS` doesn't destroy all recovery options.
+6. **Monitor the application**, not just OS/EDR telemetry this incident was invisible at the Windows logon layer.
 
 ## Appendix — Full Ransom Note
 
