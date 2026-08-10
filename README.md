@@ -196,7 +196,8 @@ MySQLAudit_CL
 | order by TimeGenerated desc
 ```
 
-<img width="1264" height="718" alt="image" src="https://github.com/user-attachments/assets/022e3efe-755d-4d09-99e6-dda31474a66e" />
+<img width="1237" height="766" alt="image" src="https://github.com/user-attachments/assets/40687fe7-c14d-410c-ba7b-633b49ee9809" />
+
 
 
 ```kql
@@ -214,7 +215,8 @@ MySQLAudit_CL
 | order by TimeGenerated desc
 ```
 
-<img width="1291" height="574" alt="image" src="https://github.com/user-attachments/assets/9e5a1908-ee43-419a-96a6-b31bea2710d4" />
+<img width="1291" height="723" alt="image" src="https://github.com/user-attachments/assets/84e62c03-ae4c-4b99-82ee-05cd7bde6290" />
+
 
 
 
