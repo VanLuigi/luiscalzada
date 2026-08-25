@@ -253,7 +253,7 @@ When I first checked `DeviceLogonEvents` for `corp-db03`, nothing stood out, no 
 ## Root Cause & Remediation
 
 1. **Root cause:** `root@'%'` with a weak, guessable password, combined with an NSG rule allowing unrestricted inbound access to port 3306.
-2. **Never expose database ports directly to the internet.** Require VPN, bastion host, or Private Link/Private Endpoint for any remote DB administration.
+2. **Never expose database ports directly to the internet.** Require a VPN, bastion host, or Private Link/Private Endpoint for any remote DB administration.
 3. **Disable password-less/weak-password root** entirely; enforce strong, unique credentials, and disable remote root login (`root@'%'` should not exist).
 4. **Least privilege** application accounts should never have `DROP`/`CREATE`/`SHUTDOWN` rights.
 5. **Enable binary logging redundancy** ship binlogs off-host so `RESET MASTER`/`PURGE BINARY LOGS` doesn't destroy all recovery options.
