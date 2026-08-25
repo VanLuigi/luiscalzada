@@ -199,7 +199,6 @@ MySQLAudit_CL
 <img width="1237" height="766" alt="image" src="https://github.com/user-attachments/assets/40687fe7-c14d-410c-ba7b-633b49ee9809" />
 
 
-
 ```kql
 let MyDevice = "corp-db03"; // set your own device name
 let ServerVulnerableDateTime = todatetime("2026-08-04T16:33:33Z");
